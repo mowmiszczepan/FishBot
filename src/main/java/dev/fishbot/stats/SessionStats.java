@@ -1,14 +1,22 @@
 package dev.fishbot.stats;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.util.Util;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
 
 /**
  * Live session statistics: time, casts, catches, rare catches, deposits
  * and experience gained (for the HUD and Discord summaries).
  */
 public class SessionStats {
+
+	/** Player must be within this range for an XP orb to be counted as collected. */
+	private static final double ORB_COLLECT_RANGE_SQ = 3.0 * 3.0;
 
 	private long sessionStart = Util.getMillis();
 	private int casts;
@@ -18,6 +26,8 @@ public class SessionStats {
 
 	private int xpBaseline = -1;
 	private int xpGained;
+	private int xpFromOrbs;
+	private final Set<Integer> countedOrbs = new HashSet<>();
 
 	public void tick(Minecraft mc) {
 		LocalPlayer player = mc.player;
@@ -31,7 +41,21 @@ public class SessionStats {
 			// Death / respawn resets the counter.
 			xpBaseline = xp;
 		}
-		xpGained = xp - xpBaseline;
+
+		// Experience absorbed by a Mending item never reaches totalExperience
+		// (the orbs repair the item first), so the level-based delta alone
+		// undercounts EXP. Also count collected XP orbs by their full value.
+		if (mc.level != null) {
+			for (Entity entity : mc.level.entitiesForRendering()) {
+				if (entity instanceof ExperienceOrb orb
+						&& orb.distanceToSqr(player) <= ORB_COLLECT_RANGE_SQ
+						&& countedOrbs.add(entity.getId())) {
+					xpFromOrbs += orb.getValue();
+				}
+			}
+		}
+
+		xpGained = Math.max(xp - xpBaseline, xpFromOrbs);
 	}
 
 	public void onCast() {
@@ -99,6 +123,8 @@ public class SessionStats {
 		deposits = 0;
 		xpBaseline = -1;
 		xpGained = 0;
+		xpFromOrbs = 0;
+		countedOrbs.clear();
 	}
 
 	public static String formatDuration(long millis) {

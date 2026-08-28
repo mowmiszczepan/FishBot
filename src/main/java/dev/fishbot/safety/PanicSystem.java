@@ -4,7 +4,6 @@ import dev.fishbot.FishBotCore;
 import dev.fishbot.config.FishBotConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.network.DisconnectionDetails;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 import net.minecraft.world.InteractionHand;
@@ -137,7 +136,9 @@ public class PanicSystem {
 			bot.getDiscord().notify(reason.getString(), 0xE74C3C);
 		}
 		if (mc.player != null && mc.player.connection != null) {
-			mc.player.connection.onDisconnect(new DisconnectionDetails(reason));
+			// getConnection().disconnect() actually closes the TCP socket; the
+			// onDisconnect callback only informs the client of a disconnect.
+			mc.player.connection.getConnection().disconnect(reason);
 		}
 	}
 

@@ -23,6 +23,7 @@ public class AutoEater {
 	private boolean eating = false;
 	private int previousSlot = -1;
 	private long eatStartedAt = 0;
+	private int eatGraceTicks = 0;
 
 	public AutoEater(FishBotCore bot) {
 		this.bot = bot;
@@ -39,10 +40,16 @@ public class AutoEater {
 		}
 
 		if (eating) {
-			// The use key stays down; finish when the item was consumed or on timeout.
-			if (!player.isUsingItem() || Util.getMillis() - eatStartedAt > EAT_TIMEOUT_MS) {
-				finish(mc);
-				// Possibly continue eating on the next tick if still hungry.
+			// Give the game a few ticks to register that the use key triggered
+			// the eating animation (isUsingItem() lags a tick or two behind).
+			if (eatGraceTicks > 0) {
+				eatGraceTicks--;
+			} else {
+				// The use key stays down; finish when the item was consumed or on timeout.
+				if (!player.isUsingItem() || Util.getMillis() - eatStartedAt > EAT_TIMEOUT_MS) {
+					finish(mc);
+					// Possibly continue eating on the next tick if still hungry.
+				}
 			}
 			return;
 		}
@@ -68,6 +75,7 @@ public class AutoEater {
 		mc.options.keyUse.setDown(true);
 		eating = true;
 		eatStartedAt = Util.getMillis();
+		eatGraceTicks = 5;
 	}
 
 	private int findBestFoodSlot(LocalPlayer player, boolean lowHealth) {
@@ -105,6 +113,7 @@ public class AutoEater {
 		}
 		previousSlot = -1;
 		eating = false;
+		eatGraceTicks = 0;
 	}
 
 	/** Emergency stop (panic / world change). */
@@ -115,6 +124,7 @@ public class AutoEater {
 		}
 		eating = false;
 		previousSlot = -1;
+		eatGraceTicks = 0;
 	}
 
 	public boolean isEating() {

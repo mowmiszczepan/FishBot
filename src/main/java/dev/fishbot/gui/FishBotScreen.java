@@ -39,6 +39,8 @@ public class FishBotScreen extends Screen {
 	private final Screen parent;
 	private final FishBotCore bot;
 	private Tab tab = Tab.FISHING;
+	private int scrollOffset;
+	private int contentBottom;
 
 	public FishBotScreen(Component title, Screen parent, FishBotCore bot) {
 		super(title);
@@ -49,11 +51,13 @@ public class FishBotScreen extends Screen {
 	@Override
 	protected void init() {
 		super.init();
+		scrollOffset = 0;
 		rebuild();
 	}
 
 	private void rebuild() {
 		clearWidgets();
+		contentBottom = 0;
 
 		// Tab buttons.
 		Tab[] tabs = Tab.values();
@@ -64,6 +68,7 @@ public class FishBotScreen extends Screen {
 			final Tab ft = t;
 			addRenderableWidget(Button.builder(Component.translatable("fishbot.tab." + t.name().toLowerCase()), btn -> {
 				tab = ft;
+				scrollOffset = 0;
 				rebuild();
 			}).bounds(x, 16, tabWidth, BUTTON_HEIGHT).build());
 			x += tabWidth + 4;
@@ -77,9 +82,25 @@ public class FishBotScreen extends Screen {
 			case PRESETS -> buildPresetsTab();
 		}
 
+		// Scroll control for tabs whose content overflows the visible area
+		// (e.g. the item-list editors on the Inventory tab).
+		int doneTop = this.height - 27;
+		int maxScroll = Math.max(0, contentBottom - (doneTop - 6));
+		scrollOffset = clamp(scrollOffset, 0, maxScroll);
+		if (maxScroll > 0) {
+			addRenderableWidget(Button.builder(Component.literal("\u25B2"), btn -> {
+				scrollOffset = clamp(scrollOffset - 24, 0, maxScroll);
+				rebuild();
+			}).bounds(6, doneTop, 20, BUTTON_HEIGHT).build());
+			addRenderableWidget(Button.builder(Component.literal("\u25BC"), btn -> {
+				scrollOffset = clamp(scrollOffset + 24, 0, maxScroll);
+				rebuild();
+			}).bounds(28, doneTop, 20, BUTTON_HEIGHT).build());
+		}
+
 		// Done button.
 		addRenderableWidget(Button.builder(Component.translatable("gui.done"), btn -> onClose())
-				.bounds(this.width / 2 - 100, this.height - 27, 200, BUTTON_HEIGHT).build());
+				.bounds(this.width / 2 - 100, doneTop, 200, BUTTON_HEIGHT).build());
 	}
 
 	// ------------------------------------------------------------------
@@ -124,6 +145,7 @@ public class FishBotScreen extends Screen {
 		y2 += ROW_HEIGHT;
 		addStepper(x2, y2, "fishbot.opt.jitter", () -> c.recastJitterPercent, v -> c.recastJitterPercent = v,
 				5, 0, 100, "fishbot.unit.percent");
+		contentBottom = 164;
 	}
 
 	private void buildInventoryTab() {
@@ -173,6 +195,7 @@ public class FishBotScreen extends Screen {
 		int afterKeep = addListEditor(x1, y1, "fishbot.opt.keep_items", c.keepItems, v -> c.keepItems = v);
 		addListEditor(x1, afterKeep + 2, "fishbot.opt.trash_items", c.trashItems, v -> c.trashItems = v);
 		addListEditor(x2, y2, "fishbot.opt.treasure_items", c.treasureItems, v -> c.treasureItems = v);
+		contentBottom = 300;
 	}
 
 	private void buildSafetyTab() {
@@ -208,6 +231,7 @@ public class FishBotScreen extends Screen {
 				c.antiAfkMinSec = v;
 			}
 		}, 5, 5, 900, "fishbot.unit.sec");
+		contentBottom = 140;
 	}
 
 	private void buildInterfaceTab() {
@@ -254,6 +278,7 @@ public class FishBotScreen extends Screen {
 			}
 		}).bounds(x2, y2, BUTTON_WIDTH, BUTTON_HEIGHT)
 				.tooltip(Tooltip.create(Component.translatable("fishbot.opt.discord_test.tip"))).build());
+		contentBottom = 210;
 	}
 
 	private void buildPresetsTab() {
@@ -316,6 +341,8 @@ public class FishBotScreen extends Screen {
 			addSessionRow(x2, y2, name, active);
 			y2 += ROW_HEIGHT;
 		}
+		// The preset/session lists self-limit to the visible area, so no scroll.
+		contentBottom = 44;
 	}
 
 	/** A built-in preset button that highlights when it is the active one. */
@@ -431,7 +458,7 @@ public class FishBotScreen extends Screen {
 	}
 
 	private int top() {
-		return 44;
+		return 44 - scrollOffset;
 	}
 
 	private void addToggle(int x, int y, String key, Supplier<Boolean> get, Consumer<Boolean> set) {

@@ -24,9 +24,15 @@ public abstract class FishingHookMixin {
 	@Shadow
 	private boolean biting;
 
+	@Shadow
+	private static EntityDataAccessor<Boolean> DATA_BITING;
+
 	@Inject(method = "onSyncedDataUpdated", at = @At("TAIL"))
 	private void fishbot$onEntityDataUpdated(EntityDataAccessor<?> accessor, CallbackInfo ci) {
-		if (!this.biting) {
+		// Only react when the specific synced-data key that represents a bite
+		// changed; other entity-data updates (attaching, gravity, ...) must not
+		// re-trigger the reeling procedure even if the biting flag is set.
+		if (!DATA_BITING.equals(accessor) || !this.biting) {
 			return;
 		}
 		FishingHook self = (FishingHook) (Object) this;
