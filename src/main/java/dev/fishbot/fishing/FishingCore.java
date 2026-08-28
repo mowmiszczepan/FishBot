@@ -34,6 +34,7 @@ public class FishingCore {
 	private boolean noRodsLeft = false;
 	private boolean haltedForPanic = false;
 	private OpenWaterState lastOpenWaterState = OpenWaterState.UNKNOWN;
+	private boolean openWaterMessageShown = false;
 
 	public FishingCore(FishBotCore bot) {
 		this.bot = bot;
@@ -254,12 +255,13 @@ public class FishingCore {
 		FishingHook hook = mc.player.fishing;
 		boolean open = OpenWaterValidator.isOpenWater(mc.level, hook.blockPosition());
 
-		if (!open && lastOpenWaterState != OpenWaterState.FAIL) {
-			mc.player.sendOverlayMessage(Component.translatable("fishbot.openwater.fail"));
-			lastOpenWaterState = OpenWaterState.FAIL;
-		} else if (open && lastOpenWaterState != OpenWaterState.SUCCESS) {
-			mc.player.sendOverlayMessage(Component.translatable("fishbot.openwater.ok"));
-			lastOpenWaterState = OpenWaterState.SUCCESS;
+		// Always refresh the HUD indicator, but only spam the overlay message
+		// on the very first cast of a session (not on every single cast).
+		lastOpenWaterState = open ? OpenWaterState.SUCCESS : OpenWaterState.FAIL;
+		if (!openWaterMessageShown) {
+			openWaterMessageShown = true;
+			mc.player.sendOverlayMessage(Component.translatable(
+					open ? "fishbot.openwater.ok" : "fishbot.openwater.fail"));
 		}
 	}
 
@@ -373,6 +375,7 @@ public class FishingCore {
 		noRodsLeft = false;
 		haltedForPanic = false;
 		lastOpenWaterState = OpenWaterState.UNKNOWN;
+		openWaterMessageShown = false;
 		monitor.handleHookRemoved();
 	}
 

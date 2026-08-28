@@ -85,6 +85,7 @@ public class FishBotCore {
 		chestManager.abort();
 		fishing.onWorldChanged();
 		rodManager.onWorldChanged();
+		stats.reset();
 	}
 
 	// ------------------------------------------------------------------

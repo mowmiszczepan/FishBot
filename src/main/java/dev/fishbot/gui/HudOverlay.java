@@ -70,15 +70,18 @@ public class HudOverlay {
 				stats.getCatches(), Math.round(stats.catchesPerHour())).getString());
 		colors.add(TEXT_COLOR);
 
-		if (stats.getRareCatches() > 0 || config.discordEnabled) {
-			lines.add(Component.translatable("fishbot.hud.rare", stats.getRareCatches()).getString());
-			colors.add(WARN_COLOR);
-		}
+		lines.add(Component.translatable("fishbot.hud.rare", stats.getRareCatches()).getString());
+		colors.add(WARN_COLOR);
 
-		if (stats.getXpGained() > 0) {
-			lines.add(Component.translatable("fishbot.hud.xp",
-					stats.getXpGained(), Math.round(stats.xpPerHour())).getString());
-			colors.add(GOOD_COLOR);
+		lines.add(Component.translatable("fishbot.hud.xp",
+				stats.getXpGained(), Math.round(stats.xpPerHour())).getString());
+		colors.add(GOOD_COLOR);
+
+		// Which preset / session is currently applied.
+		String activePreset = config.activePreset;
+		if (activePreset != null && !activePreset.isEmpty()) {
+			lines.add(Component.translatable("fishbot.hud.preset", activePreset).getString());
+			colors.add(TITLE_COLOR);
 		}
 
 		// Rod durability (hotbar rods)

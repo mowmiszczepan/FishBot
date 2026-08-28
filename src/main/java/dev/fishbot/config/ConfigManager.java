@@ -22,12 +22,14 @@ public class ConfigManager {
 
 	private final Path configPath;
 	private final Path presetsDir;
+	private final Path sessionsDir;
 	private FishBotConfig config;
 
 	public ConfigManager() {
 		Path configDir = FabricLoader.getInstance().getConfigDir();
 		this.configPath = configDir.resolve("fishbot.json");
 		this.presetsDir = configDir.resolve("fishbot_presets");
+		this.sessionsDir = configDir.resolve("fishbot_sessions");
 		this.config = load();
 	}
 
@@ -84,10 +86,54 @@ public class ConfigManager {
 
 	/** Names of custom presets stored in config/fishbot_presets/. */
 	public List<String> listCustomPresets() {
+		return listJsonNames(presetsDir);
+	}
+
+	/** Remove a custom preset file. */
+	public void deleteCustomPreset(String name) {
+		deleteJson(presetsDir, name);
+	}
+
+	// ------------------------------------------------------------------
+	// Sessions
+	// ------------------------------------------------------------------
+
+	/** Names of saved sessions stored in config/fishbot_sessions/. */
+	public List<String> listSessions() {
+		return listJsonNames(sessionsDir);
+	}
+
+	public void saveSession(FishBotSession session) {
+		try {
+			Files.createDirectories(sessionsDir);
+			Files.writeString(sessionsDir.resolve(sanitize(session.name) + ".json"),
+					GSON.toJson(session), StandardCharsets.UTF_8);
+		} catch (IOException e) {
+			System.err.println("[FishBot] Failed to save session '" + session.name + "': " + e);
+		}
+	}
+
+	public FishBotSession loadSession(String name) {
+		try {
+			Path file = sessionsDir.resolve(sanitize(name) + ".json");
+			if (Files.exists(file)) {
+				return GSON.fromJson(Files.readString(file, StandardCharsets.UTF_8), FishBotSession.class);
+			}
+		} catch (Exception e) {
+			System.err.println("[FishBot] Failed to load session '" + name + "': " + e);
+		}
+		return null;
+	}
+
+	public void deleteSession(String name) {
+		deleteJson(sessionsDir, name);
+	}
+
+	private static List<String> listJsonNames(Path dir) {
 		List<String> names = new ArrayList<>();
 		try {
-			if (Files.isDirectory(presetsDir)) {
-				try (DirectoryStream<Path> stream = Files.newDirectoryStream(presetsDir, "*.json")) {
+			if (Files.isDirectory(dir)) {
+				try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir, "*.json")) {
 					for (Path p : stream) {
 						String name = p.getFileName().toString();
 						names.add(name.substring(0, name.length() - 5));
@@ -98,6 +144,14 @@ public class ConfigManager {
 		}
 		Collections.sort(names);
 		return names;
+	}
+
+	private static void deleteJson(Path dir, String name) {
+		try {
+			Files.deleteIfExists(dir.resolve(sanitize(name) + ".json"));
+		} catch (IOException e) {
+			System.err.println("[FishBot] Failed to delete '" + name + "': " + e);
+		}
 	}
 
 	public FishBotConfig loadCustomPreset(String name) {

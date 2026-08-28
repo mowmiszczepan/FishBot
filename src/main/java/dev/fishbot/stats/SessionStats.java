@@ -35,6 +35,11 @@ public class SessionStats {
 	}
 
 	public void onCast() {
+		// Start the session clock on the first cast so the per-hour figures
+		// aren't diluted by idle time spent before fishing actually began.
+		if (casts == 0) {
+			sessionStart = Util.getMillis();
+		}
 		casts++;
 	}
 

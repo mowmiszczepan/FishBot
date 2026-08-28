@@ -157,5 +157,19 @@
 	"fishbot.preset.defaults": "Domyślne",
 	"fishbot.preset.defaults.tip": "Przywróć domyślną, zbalansowaną konfigurację.",
 	"fishbot.preset.save": "Zapisz obecne jako preset",
-	"fishbot.preset.save.tip": "Zapisz obecne ustawienia jako plik presetu do ponownego użycia."
+	"fishbot.preset.save.tip": "Zapisz obecne ustawienia jako plik presetu do ponownego użycia.",
+	"fishbot.preset.builtin": "Presety wbudowane",
+	"fishbot.preset.custom": "Presety własne",
+	"fishbot.preset.new_session": "Utwórz nową sesję",
+	"fishbot.preset.new_session.tip": "Zapisz statystyki i ustawienia bieżącej sesji jako sesję wielokrotnego użytku.",
+	"fishbot.preset.apply.tip": "Zastosuj ten preset.",
+	"fishbot.preset.delete": "✕",
+	"fishbot.preset.delete.tip": "Usuń ten preset/sesję.",
+	"fishbot.session.header": "Sesje",
+	"fishbot.session.time": "Czas: %s",
+	"fishbot.session.fish": "Ryby: %s",
+	"fishbot.session.xp": "EXP: +%s",
+	"fishbot.session.rare": "Rzadkie: %s",
+
+	"fishbot.hud.preset": "Preset: %s"
 }

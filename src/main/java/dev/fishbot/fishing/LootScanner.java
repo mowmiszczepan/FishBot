@@ -10,7 +10,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
 
 /**
@@ -70,10 +70,14 @@ public class LootScanner {
 	}
 
 	private boolean isRareCatch(FishBotConfig config, ItemStack stack) {
-		if (ItemLists.matches(config.rareItems, stack)) {
-			return true;
+		if (!ItemLists.matches(config.rareItems, stack)) {
+			return false;
 		}
-		// Anything of RARE/EPIC rarity that isn't a plain fish counts too.
-		return stack.getRarity().compareTo(Rarity.RARE) >= 0;
+		// Only enchanted versions count as a "rare catch": an enchanted book is
+		// always enchanted, but bows and fishing rods only count once enchanted.
+		if (stack.is(Items.BOW) || ItemLists.isRod(stack)) {
+			return stack.isEnchanted();
+		}
+		return true;
 	}
 }

@@ -177,10 +177,16 @@ public class FishBotConfig {
 	/** Item ids that count as "rare" for HUD stats and Discord alerts. */
 	public List<String> rareItems = new ArrayList<>(List.of(
 			"minecraft:enchanted_book",
-			"minecraft:saddle",
-			"minecraft:name_tag",
-			"minecraft:nautilus_shell"
+			"minecraft:bow",
+			"minecraft:fishing_rod"
 	));
+
+	// ------------------------------------------------------------------
+	// Presets & sessions
+	// ------------------------------------------------------------------
+
+	/** Name of the currently-active preset/session, shown in the HUD. */
+	public String activePreset;
 
 	// ------------------------------------------------------------------
 	// Behaviour
