@@ -1,0 +1,33 @@
+{
+	"schemaVersion": 1,
+	"id": "fishbot",
+	"version": "${version}",
+	"name": "FishBot",
+	"description": "Zaawansowany bot wędkarski dla Minecraft 26.2: pakietowa detekcja brań, walidacja Open Water, zarządzanie wędkami z Mending, opróżnianie do skrzyń, auto-jedzenie, panic failsafe, anty-AFK, HUD ze statystykami i powiadomienia Discord.",
+	"authors": [
+		"mowmiszczepan"
+	],
+	"contact": {
+		"sources": "https://github.com/mowmiszczepan/FishBot"
+	},
+	"license": "GPL-3.0",
+	"icon": "assets/fishbot/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"dev.fishbot.FishBot"
+		]
+	},
+	"mixins": [
+		"fishbot.mixins.json"
+	],
+	"depends": {
+		"fabricloader": ">=0.19.3",
+		"minecraft": "~26.2",
+		"java": ">=25",
+		"fabric-api": "*"
+	},
+	"custom": {
+		"reference": "Based on patterns from XPlus Autofish (troyboy50/Wudji), GPL-3.0"
+	}
+}
