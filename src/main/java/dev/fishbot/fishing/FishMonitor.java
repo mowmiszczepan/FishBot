@@ -33,12 +33,15 @@ public class FishMonitor {
 	private static final long MIN_TIME_IN_WATER_MS = 1000;
 	// Sound detection: bobber must be within 4 blocks of the splash.
 	private static final double SOUND_DISTANCE_SQ_THRESHOLD = 16.0;
+	// Only run the (relatively expensive) water-block check every N ticks.
+	private static final long WATER_CHECK_INTERVAL_MS = 500;
 
 	private final FishingCore core;
 
 	// Motion detection state.
 	private boolean hasHitWater = false;
 	private long bobberRiseTimestamp = 0;
+	private long lastWaterCheck = 0;
 
 	// Debounce: once a bite was handled, ignore everything until the hook is gone.
 	private boolean biteHandled = false;
@@ -132,6 +135,11 @@ public class FishMonitor {
 
 	/** Track whether the bobber has landed in water (motion mode). */
 	public void hookTick(net.minecraft.world.entity.projectile.FishingHook hook) {
+		long now = net.minecraft.util.Util.getMillis();
+		if (now - lastWaterCheck < WATER_CHECK_INTERVAL_MS) {
+			return;
+		}
+		lastWaterCheck = now;
 		if (hookInWater(hook.level(), hook.getBoundingBox())) {
 			hasHitWater = true;
 		}
@@ -142,6 +150,7 @@ public class FishMonitor {
 		hasHitWater = false;
 		bobberRiseTimestamp = 0;
 		biteHandled = false;
+		lastWaterCheck = 0;
 	}
 
 	private static boolean hookInWater(Level level, AABB box) {

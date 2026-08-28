@@ -441,14 +441,14 @@ public class FishBotScreen extends Screen {
 	/** Save the current session's stats and settings to a file. */
 	private void saveCurrentSession() {
 		SessionStats stats = bot.getStats();
-		FishBotSession session = new FishBotSession();
-		session.name = "session_" + timestamp();
-		session.savedAt = System.currentTimeMillis();
-		session.sessionMillis = stats.sessionMillis();
-		session.catches = stats.getCatches();
-		session.xp = stats.getXpGained();
-		session.rareCatches = stats.getRareCatches();
-		session.config = ConfigManager.copy(bot.getConfig());
+		FishBotSession session = new FishBotSession(
+				"session_" + timestamp(),
+				System.currentTimeMillis(),
+				stats.sessionMillis(),
+				stats.getCatches(),
+				stats.getXpGained(),
+				stats.getRareCatches(),
+				ConfigManager.copy(bot.getConfig()));
 		bot.getConfigManager().saveSession(session);
 		if (this.minecraft != null && this.minecraft.player != null) {
 			this.minecraft.player.sendSystemMessage(Component.translatable("fishbot.session.saved", session.name));
@@ -499,9 +499,9 @@ public class FishBotScreen extends Screen {
 
 	private Component sessionTooltip(FishBotSession session) {
 		String text = Component.translatable("fishbot.session.info.time",
-				SessionStats.formatDuration(session.sessionMillis)).getString() + "\n"
+				SessionStats.formatDuration(session.durationMs)).getString() + "\n"
 				+ Component.translatable("fishbot.session.info.fish", session.catches).getString() + "\n"
-				+ Component.translatable("fishbot.session.info.xp", session.xp).getString() + "\n"
+				+ Component.translatable("fishbot.session.info.xp", session.xpGained).getString() + "\n"
 				+ Component.translatable("fishbot.session.info.rare", session.rareCatches).getString();
 		return Component.literal(text);
 	}
@@ -555,7 +555,8 @@ public class FishBotScreen extends Screen {
 	}
 
 	private Component cycleText(String key, Component value) {
-		return Component.translatable(key).append(": ").append(value.withStyle(ChatFormatting.AQUA));
+		return Component.translatable(key).append(": ")
+				.append(value.copy().withStyle(ChatFormatting.AQUA));
 	}
 
 	private void addStepper(int x, int y, String key, Supplier<Integer> get, Consumer<Integer> set,

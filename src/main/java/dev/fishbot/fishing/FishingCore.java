@@ -35,7 +35,6 @@ public class FishingCore {
 	private boolean haltedForPanic = false;
 	private boolean holdRecast = false;
 	private OpenWaterState lastOpenWaterState = OpenWaterState.UNKNOWN;
-	private boolean openWaterMessageShown = false;
 
 	public FishingCore(FishBotCore bot) {
 		this.bot = bot;
@@ -257,23 +256,20 @@ public class FishingCore {
 		FishingHook hook = mc.player.fishing;
 		boolean open = OpenWaterValidator.isOpenWater(mc.level, hook.blockPosition());
 
-		// Always refresh the HUD indicator, but only spam the overlay message
-		// on the very first cast of a session (not on every single cast).
+		// Refresh the HUD indicator and show the actionbar message on every
+		// cast so the player always knows the state of the current spot.
 		lastOpenWaterState = open ? OpenWaterState.SUCCESS : OpenWaterState.FAIL;
-		if (!openWaterMessageShown) {
-			openWaterMessageShown = true;
-			mc.player.sendOverlayMessage(Component.translatable(
-					open ? "fishbot.openwater.ok" : "fishbot.openwater.fail"));
-		}
+		mc.player.sendOverlayMessage(Component.translatable(
+				open ? "fishbot.openwater.ok" : "fishbot.openwater.fail"));
 	}
 
 	/**
-	 * Run the open-water validation shortly after the bobber has landed in the
-	 * water (rather than waiting until a bite), so the player sees the result
-	 * right after casting.
+	 * Run the open-water validation 1.5 seconds after the bobber has landed in
+	 * the water (rather than waiting until a bite), so the player sees the
+	 * result right after casting.
 	 */
 	private void scheduleOpenWaterCheck() {
-		bot.getScheduler().schedule(1200, () -> detectOpenWater(Minecraft.getInstance()));
+		bot.getScheduler().schedule(1500, () -> detectOpenWater(Minecraft.getInstance()));
 	}
 
 	/** Latest open-water result, for the HUD. */
@@ -333,6 +329,37 @@ public class FishingCore {
 		useRod();
 		bot.getStats().onCast();
 		scheduleOpenWaterCheck();
+	}
+
+	/**
+	 * Reel in a cast bobber so the bot can safely interact with a chest, and
+	 * hold off any automatic recast until {@link #recastAfterDeposit} is called.
+	 */
+	public void reelInForDeposit() {
+		if (hookExists) {
+			useRod(); // reel in
+		}
+		recastQueued = false;
+		holdRecast = true;
+	}
+
+	/** After a deposit finishes, select the rod and immediately recast. */
+	public void recastAfterDeposit(Minecraft mc) {
+		holdRecast = false;
+		if (mc.player == null || mc.level == null || mc.gameMode == null) {
+			return;
+		}
+		if (!isHoldingFishingRod(mc.player)) {
+			return;
+		}
+		useRod();
+		bot.getStats().onCast();
+		scheduleOpenWaterCheck();
+	}
+
+	/** Clear the recast hold without casting (used when a deposit is aborted). */
+	public void cancelHoldRecast() {
+		holdRecast = false;
 	}
 
 	private InteractionHand getCorrectHand(LocalPlayer player) {
@@ -417,12 +444,16 @@ public class FishingCore {
 		haltedForPanic = false;
 		holdRecast = false;
 		lastOpenWaterState = OpenWaterState.UNKNOWN;
-		openWaterMessageShown = false;
 		monitor.handleHookRemoved();
 	}
 
 	public FishMonitor getMonitor() {
 		return monitor;
+	}
+
+	/** Direct access to the active configuration (used by bite-monitor helpers). */
+	public FishBotConfig getConfig() {
+		return bot.getConfig();
 	}
 
 	public enum OpenWaterState {

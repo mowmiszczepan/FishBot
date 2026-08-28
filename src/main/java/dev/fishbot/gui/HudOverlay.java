@@ -17,6 +17,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.Util;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
@@ -32,8 +33,13 @@ public class HudOverlay {
 	private static final int WARN_COLOR = 0xFFFFAA00;
 	private static final int BAD_COLOR = 0xFFFF5555;
 	private static final int BACKGROUND_COLOR = 0x90101018;
+	/** Rebuild the HUD text at most once per second instead of every frame. */
+	private static final long HUD_REFRESH_INTERVAL_MS = 1000;
 
 	private final FishBotCore bot;
+	private final List<String> cachedLines = new ArrayList<>();
+	private final List<Integer> cachedColors = new ArrayList<>();
+	private long lastRefresh = 0;
 
 	public HudOverlay(FishBotCore bot) {
 		this.bot = bot;
@@ -52,51 +58,15 @@ public class HudOverlay {
 		}
 
 		Font font = mc.font;
-		SessionStats stats = bot.getStats();
 
-		List<String> lines = new ArrayList<>();
-		List<Integer> colors = new ArrayList<>();
-
-		// Title + status
-		lines.add("FishBot " + statusText());
-		colors.add(TITLE_COLOR);
-
-		// Session stats
-		lines.add(Component.translatable("fishbot.hud.time",
-				SessionStats.formatDuration(stats.sessionMillis())).getString());
-		colors.add(TEXT_COLOR);
-
-		lines.add(Component.translatable("fishbot.hud.fish",
-				stats.getCatches(), Math.round(stats.catchesPerHour())).getString());
-		colors.add(TEXT_COLOR);
-
-		lines.add(Component.translatable("fishbot.hud.rare", stats.getRareCatches()).getString());
-		colors.add(WARN_COLOR);
-
-		lines.add(Component.translatable("fishbot.hud.xp",
-				stats.getXpGained(), Math.round(stats.xpPerHour())).getString());
-		colors.add(GOOD_COLOR);
-
-		// Which preset / session is currently applied. Built-in keys (e.g.
-		// "defaults") are translated; anything else is a custom preset name.
-		String activePreset = config.activePreset;
-		if (activePreset != null && !activePreset.isEmpty()) {
-			lines.add(Component.translatable("fishbot.hud.preset", presetLabel(activePreset)).getString());
-			colors.add(TITLE_COLOR);
+		// Rebuild the text once per second (cheap) instead of every frame.
+		long now = Util.getMillis();
+		if (now - lastRefresh >= HUD_REFRESH_INTERVAL_MS) {
+			lastRefresh = now;
+			rebuildLines(mc, config);
 		}
-
-		// Rod durability (hotbar rods)
-		addRodLines(mc, lines, colors);
-
-		// Open water indicator while the hook is out
-		FishingCore.OpenWaterState openWater = bot.getFishing().getOpenWaterState();
-		if (openWater == FishingCore.OpenWaterState.SUCCESS) {
-			lines.add(Component.translatable("fishbot.hud.openwater.ok").getString());
-			colors.add(GOOD_COLOR);
-		} else if (openWater == FishingCore.OpenWaterState.FAIL) {
-			lines.add(Component.translatable("fishbot.hud.openwater.fail").getString());
-			colors.add(BAD_COLOR);
-		}
+		List<String> lines = cachedLines;
+		List<Integer> colors = cachedColors;
 
 		// Measure and draw the panel.
 		int width = 0;
@@ -110,6 +80,54 @@ public class HudOverlay {
 		graphics.fill(x, y, x + width + 8, y + height, BACKGROUND_COLOR);
 		for (int i = 0; i < lines.size(); i++) {
 			graphics.text(font, lines.get(i), x + 4, y + 3 + i * (font.lineHeight + 1), colors.get(i), true);
+		}
+	}
+
+	/** Build the HUD text lines; called at most once per second. */
+	private void rebuildLines(Minecraft mc, FishBotConfig config) {
+		SessionStats stats = bot.getStats();
+		cachedLines.clear();
+		cachedColors.clear();
+
+		// Title + status
+		cachedLines.add("FishBot " + statusText());
+		cachedColors.add(TITLE_COLOR);
+
+		// Session stats
+		cachedLines.add(Component.translatable("fishbot.hud.time",
+				SessionStats.formatDuration(stats.sessionMillis())).getString());
+		cachedColors.add(TEXT_COLOR);
+
+		cachedLines.add(Component.translatable("fishbot.hud.fish",
+				stats.getCatches(), Math.round(stats.catchesPerHour())).getString());
+		cachedColors.add(TEXT_COLOR);
+
+		cachedLines.add(Component.translatable("fishbot.hud.rare", stats.getRareCatches()).getString());
+		cachedColors.add(WARN_COLOR);
+
+		cachedLines.add(Component.translatable("fishbot.hud.xp",
+				stats.getXpGained(), Math.round(stats.xpPerHour())).getString());
+		cachedColors.add(GOOD_COLOR);
+
+		// Which preset / session is currently applied. Built-in keys (e.g.
+		// "defaults") are translated; anything else is a custom preset name.
+		String activePreset = config.activePreset;
+		if (activePreset != null && !activePreset.isEmpty()) {
+			cachedLines.add(Component.translatable("fishbot.hud.preset", presetLabel(activePreset)).getString());
+			cachedColors.add(TITLE_COLOR);
+		}
+
+		// Rod durability (hotbar rods)
+		addRodLines(mc, cachedLines, cachedColors);
+
+		// Open water indicator while the hook is out
+		FishingCore.OpenWaterState openWater = bot.getFishing().getOpenWaterState();
+		if (openWater == FishingCore.OpenWaterState.SUCCESS) {
+			cachedLines.add(Component.translatable("fishbot.hud.openwater.ok").getString());
+			cachedColors.add(GOOD_COLOR);
+		} else if (openWater == FishingCore.OpenWaterState.FAIL) {
+			cachedLines.add(Component.translatable("fishbot.hud.openwater.fail").getString());
+			cachedColors.add(BAD_COLOR);
 		}
 	}
 

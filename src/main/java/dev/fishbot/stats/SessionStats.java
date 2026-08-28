@@ -17,6 +17,8 @@ public class SessionStats {
 
 	/** Player must be within this range for an XP orb to be counted as collected. */
 	private static final double ORB_COLLECT_RANGE_SQ = 3.0 * 3.0;
+	/** Recompute stats at most once per second instead of on every tick. */
+	private static final long STAT_REFRESH_INTERVAL_MS = 1000;
 
 	private long sessionStart = Util.getMillis();
 	private int casts;
@@ -28,12 +30,19 @@ public class SessionStats {
 	private int xpGained;
 	private int xpFromOrbs;
 	private final Set<Integer> countedOrbs = new HashSet<>();
+	private long lastStatRefresh = 0;
 
 	public void tick(Minecraft mc) {
 		LocalPlayer player = mc.player;
 		if (player == null) {
 			return;
 		}
+		// Cheap throttling: the heavy XP/orb work only runs once per second.
+		long now = Util.getMillis();
+		if (now - lastStatRefresh < STAT_REFRESH_INTERVAL_MS) {
+			return;
+		}
+		lastStatRefresh = now;
 		int xp = player.totalExperience;
 		if (xpBaseline < 0) {
 			xpBaseline = xp;
@@ -125,6 +134,7 @@ public class SessionStats {
 		xpGained = 0;
 		xpFromOrbs = 0;
 		countedOrbs.clear();
+		lastStatRefresh = 0;
 	}
 
 	public static String formatDuration(long millis) {

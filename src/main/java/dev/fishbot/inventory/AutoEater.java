@@ -118,10 +118,11 @@ public class AutoEater {
 		return bestSlot;
 	}
 
-	/** Cod/salmon variants that a fishing session naturally yields. */
+	/** Fish variants that a fishing session naturally yields. */
 	private static boolean isFish(net.minecraft.world.item.Item item) {
 		return item == Items.COD || item == Items.SALMON
-				|| item == Items.COOKED_COD || item == Items.COOKED_SALMON;
+				|| item == Items.COOKED_COD || item == Items.COOKED_SALMON
+				|| item == Items.TROPICAL_FISH || item == Items.PUFFERFISH;
 	}
 
 	private void finish(Minecraft mc) {

@@ -89,6 +89,7 @@ public class ChestManager {
 		menuId = -1;
 		filledChests.clear();
 		cooldownUntil = Math.max(cooldownUntil, now() + 2000);
+		bot.getFishing().cancelHoldRecast();
 	}
 
 	// ------------------------------------------------------------------
@@ -112,6 +113,9 @@ public class ChestManager {
 				boolean full = inventoryUsedSlots(player) >= config.depositTriggerSlots;
 				if ((pendingManualRequest || (config.enabled && config.autoDeposit && full)) && now() >= cooldownUntil) {
 					pendingManualRequest = false;
+					// Reel in any cast bobber so interacting with the chest doesn't
+					// conflict with a fishing rod in hand.
+					bot.getFishing().reelInForDeposit();
 					state = State.SEARCH;
 				} else if (pendingManualRequest && now() < cooldownUntil) {
 					pendingManualRequest = false; // swallowed by cooldown
@@ -179,6 +183,8 @@ public class ChestManager {
 			}
 			state = State.COOLDOWN;
 			cooldownUntil = now() + FAIL_COOLDOWN_MS;
+			// Resume fishing since there is nothing to deposit into.
+			bot.getFishing().recastAfterDeposit(mc);
 			return;
 		}
 
@@ -352,6 +358,9 @@ public class ChestManager {
 		cooldownUntil = now() + CLOSE_COOLDOWN_MS;
 		target = null;
 		menuId = -1;
+
+		// Resume fishing: select the rod and recast immediately.
+		bot.getFishing().recastAfterDeposit(mc);
 	}
 
 	// ------------------------------------------------------------------

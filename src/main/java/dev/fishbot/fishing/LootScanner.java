@@ -35,13 +35,17 @@ public class LootScanner {
 
 	/** Schedule a few scans around the moment the catch lands. */
 	public void scanAfterCatch(Vec3 hookPos) {
+		// Track the player so drops that are pulled to the player (rather than
+		// staying near the bobber) are still counted.
+		Minecraft mc = Minecraft.getInstance();
+		Vec3 playerPos = mc.player != null ? mc.player.position() : hookPos;
 		countedEntities.clear();
 		for (long delay : SCAN_DELAYS_MS) {
-			bot.getScheduler().schedule(delay, () -> scan(hookPos));
+			bot.getScheduler().schedule(delay, () -> scan(hookPos, playerPos));
 		}
 	}
 
-	private void scan(Vec3 pos) {
+	private void scan(Vec3 hookPos, Vec3 playerPos) {
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.level == null || mc.player == null) {
 			return;
@@ -52,7 +56,9 @@ public class LootScanner {
 			if (!(entity instanceof ItemEntity itemEntity)) {
 				continue;
 			}
-			if (entity.distanceToSqr(pos.x, pos.y, pos.z) > SCAN_RADIUS_SQ) {
+			// A freshly caught item is either near the bobber or near the player.
+			if (entity.distanceToSqr(hookPos.x, hookPos.y, hookPos.z) > SCAN_RADIUS_SQ
+					&& entity.distanceToSqr(playerPos.x, playerPos.y, playerPos.z) > SCAN_RADIUS_SQ) {
 				continue;
 			}
 			if (countedEntities.contains(entity.getId())) {

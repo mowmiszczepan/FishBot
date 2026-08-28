@@ -14,17 +14,32 @@ public class FishBotSession {
 	public long savedAt;
 
 	/** How long the fishing session had been running when it was saved. */
-	public long sessionMillis;
+	public long durationMs;
 
 	/** Fish caught in that session. */
 	public int catches;
 
 	/** Experience gained in that session. */
-	public int xp;
+	public int xpGained;
 
 	/** Rare drops (enchanted books / bows / rods) caught in that session. */
 	public int rareCatches;
 
 	/** The settings snapshot so applying the session restores them. */
 	public FishBotConfig config;
+
+	public FishBotSession() {
+	}
+
+	/** Full constructor for all statistics fields. */
+	public FishBotSession(String name, long savedAt, long durationMs,
+			int catches, int xpGained, int rareCatches, FishBotConfig config) {
+		this.name = name;
+		this.savedAt = savedAt;
+		this.durationMs = durationMs;
+		this.catches = catches;
+		this.xpGained = xpGained;
+		this.rareCatches = rareCatches;
+		this.config = config;
+	}
 }
