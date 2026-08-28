@@ -80,7 +80,7 @@ public class RodManager {
 					&& hasMending(main) && off.isEmpty()) {
 				int hotbarSlot = player.getInventory().getSelectedSlot();
 				// Menu slot of hotbar slot i in the player inventory menu is 36 + i.
-				mc.gameMode.handleContainerInput(0, 36 + hotbarSlot, Inventory.SLOT_OFFHAND,
+				mc.gameMode.handleContainerInput(0, 36 + hotbarSlot, 45 /* InventoryMenu.SHIELD_SLOT */,
 						ContainerInput.SWAP, player);
 				mendingSwapped = true;
 				mendingHotbarSlot = hotbarSlot;
@@ -90,7 +90,7 @@ public class RodManager {
 			boolean orbsGone = now - lastOrbSeenAt > SWAP_BACK_DELAY_MS;
 			boolean repaired = !ItemLists.isRod(off) || !off.isDamageableItem() || off.getDamageValue() <= 0;
 			if (orbsGone || repaired) {
-				mc.gameMode.handleContainerInput(0, 36 + mendingHotbarSlot, Inventory.SLOT_OFFHAND,
+				mc.gameMode.handleContainerInput(0, 36 + mendingHotbarSlot, 45 /* InventoryMenu.SHIELD_SLOT */,
 						ContainerInput.SWAP, player);
 				mendingSwapped = false;
 				mendingHotbarSlot = -1;

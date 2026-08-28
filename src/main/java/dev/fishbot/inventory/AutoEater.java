@@ -24,6 +24,7 @@ public class AutoEater {
 	private int previousSlot = -1;
 	private long eatStartedAt = 0;
 	private int eatGraceTicks = 0;
+	private boolean needRecast = false;
 
 	public AutoEater(FishBotCore bot) {
 		this.bot = bot;
@@ -70,6 +71,12 @@ public class AutoEater {
 			return;
 		}
 
+		// If a bobber is cast, reel it in first so the fish can be eaten safely.
+		if (bot.getFishing().hookExists()) {
+			bot.getFishing().reelInForEat();
+			needRecast = true;
+		}
+
 		previousSlot = player.getInventory().getSelectedSlot();
 		player.getInventory().setSelectedSlot(slot);
 		mc.options.keyUse.setDown(true);
@@ -95,6 +102,11 @@ public class AutoEater {
 				continue;
 			}
 			int score = food.nutrition();
+			// Prefer fish (cooked/raw cod & salmon) — they come straight from the
+			// session and shouldn't be wasted as generic food.
+			if (isFish(stack.getItem())) {
+				score += 1000;
+			}
 			if (stack.getItem() == Items.GOLDEN_APPLE || stack.getItem() == Items.ENCHANTED_GOLDEN_APPLE) {
 				score += lowHealth ? 100 : -1; // prefer them only when hurt
 			}
@@ -106,14 +118,26 @@ public class AutoEater {
 		return bestSlot;
 	}
 
+	/** Cod/salmon variants that a fishing session naturally yields. */
+	private static boolean isFish(net.minecraft.world.item.Item item) {
+		return item == Items.COD || item == Items.SALMON
+				|| item == Items.COOKED_COD || item == Items.COOKED_SALMON;
+	}
+
 	private void finish(Minecraft mc) {
 		mc.options.keyUse.setDown(false);
 		if (mc.player != null && previousSlot >= 0) {
 			mc.player.getInventory().setSelectedSlot(previousSlot);
 		}
+		boolean recast = needRecast;
+		needRecast = false;
 		previousSlot = -1;
 		eating = false;
 		eatGraceTicks = 0;
+		// Resume fishing: switch back to the rod (previousSlot) and recast.
+		if (recast) {
+			bot.getFishing().castAfterEat(mc);
+		}
 	}
 
 	/** Emergency stop (panic / world change). */
@@ -125,6 +149,7 @@ public class AutoEater {
 		eating = false;
 		previousSlot = -1;
 		eatGraceTicks = 0;
+		needRecast = false;
 	}
 
 	public boolean isEating() {

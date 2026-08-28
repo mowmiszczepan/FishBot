@@ -33,7 +33,7 @@ public class FishBotScreen extends Screen {
 	private static final int BUTTON_HEIGHT = 20;
 
 	private enum Tab {
-		FISHING, INVENTORY, SAFETY, INTERFACE, PRESETS
+		FISHING, INVENTORY, SAFETY, INTERFACE, PRESETS, SESSIONS
 	}
 
 	private final Screen parent;
@@ -41,6 +41,7 @@ public class FishBotScreen extends Screen {
 	private Tab tab = Tab.FISHING;
 	private int scrollOffset;
 	private int contentBottom;
+	private String newPresetName = "";
 
 	public FishBotScreen(Component title, Screen parent, FishBotCore bot) {
 		super(title);
@@ -80,6 +81,7 @@ public class FishBotScreen extends Screen {
 			case SAFETY -> buildSafetyTab();
 			case INTERFACE -> buildInterfaceTab();
 			case PRESETS -> buildPresetsTab();
+			case SESSIONS -> buildSessionsTab();
 		}
 
 		// Scroll control for tabs whose content overflows the visible area
@@ -190,11 +192,11 @@ public class FishBotScreen extends Screen {
 				.tooltip(Tooltip.create(Component.translatable("fishbot.opt.deposit_now.tip"))).build());
 		y2 += ROW_HEIGHT + 10;
 
-		// Item lists (comma separated ids) under both columns.
+		// Item lists (comma separated ids). Treasure items are intentionally NOT
+		// editable: the rare-drop rule (enchanted book / bow / rod) is fixed.
 		y1 += 8;
 		int afterKeep = addListEditor(x1, y1, "fishbot.opt.keep_items", c.keepItems, v -> c.keepItems = v);
 		addListEditor(x1, afterKeep + 2, "fishbot.opt.trash_items", c.trashItems, v -> c.trashItems = v);
-		addListEditor(x2, y2, "fishbot.opt.treasure_items", c.treasureItems, v -> c.treasureItems = v);
 		contentBottom = 300;
 	}
 
@@ -288,38 +290,31 @@ public class FishBotScreen extends Screen {
 		int y2 = top();
 		String active = bot.getConfig().activePreset;
 
-		// Left column: built-in presets, each showing a check-mark indicator
-		// when it is the currently applied preset.
+		// Left column: only the built-in "Defaults" preset remains.
 		addRenderableWidget(new StringWidget(x1, y1, BUTTON_WIDTH, 10,
 				Component.translatable("fishbot.preset.builtin"), this.font));
 		y1 += 12;
-
-		addBuiltInPreset(x1, y1, "fishbot.preset.overnight", Presets.overnightAfk(), active);
-		y1 += ROW_HEIGHT;
-		addBuiltInPreset(x1, y1, "fishbot.preset.treasure", Presets.treasureHunter(), active);
-		y1 += ROW_HEIGHT;
-		addBuiltInPreset(x1, y1, "fishbot.preset.fast", Presets.fastFishing(), active);
-		y1 += ROW_HEIGHT;
-		addBuiltInPreset(x1, y1, "fishbot.preset.defaults", Presets.defaults(), active);
+		addRenderableWidget(Button.builder(presetLabel(
+				Component.translatable("fishbot.preset.defaults").getString(), active),
+				btn -> applyDefaults())
+				.bounds(x1, y1, BUTTON_WIDTH, BUTTON_HEIGHT)
+				.tooltip(Tooltip.create(Component.translatable("fishbot.preset.defaults.tip"))).build());
 		y1 += ROW_HEIGHT;
 
-		// Right column: save current settings, create a session, then the
-		// custom presets and saved sessions (each with an apply + delete pair).
-		addRenderableWidget(Button.builder(Component.translatable("fishbot.preset.save"), btn -> {
-			bot.getConfigManager().saveCustomPreset("preset_" + timestamp(), ConfigManager.copy(bot.getConfig()));
-			rebuild();
-		}).bounds(x2, y2, BUTTON_WIDTH, BUTTON_HEIGHT)
-				.tooltip(Tooltip.create(Component.translatable("fishbot.preset.save.tip"))).build());
-		y2 += ROW_HEIGHT;
-
-		addRenderableWidget(Button.builder(Component.translatable("fishbot.preset.new_session"), btn -> createSession())
-				.bounds(x2, y2, BUTTON_WIDTH, BUTTON_HEIGHT)
-				.tooltip(Tooltip.create(Component.translatable("fishbot.preset.new_session.tip"))).build());
-		y2 += ROW_HEIGHT + 6;
-
+		// Right column: name field + save, then the user's saved presets.
 		addRenderableWidget(new StringWidget(x2, y2, BUTTON_WIDTH, 10,
 				Component.translatable("fishbot.preset.custom"), this.font));
 		y2 += 12;
+		EditBox nameBox = new EditBox(this.font, x2, y2, BUTTON_WIDTH - 46, BUTTON_HEIGHT,
+				Component.translatable("fishbot.preset.name"));
+		nameBox.setMaxLength(40);
+		nameBox.setValue(newPresetName);
+		nameBox.setResponder(v -> newPresetName = v);
+		addRenderableWidget(nameBox);
+		addRenderableWidget(Button.builder(Component.translatable("fishbot.preset.save"), btn -> savePreset())
+				.bounds(x2 + BUTTON_WIDTH - 46, y2, 46, BUTTON_HEIGHT)
+				.tooltip(Tooltip.create(Component.translatable("fishbot.preset.save.tip"))).build());
+		y2 += ROW_HEIGHT;
 
 		for (String name : bot.getConfigManager().listCustomPresets()) {
 			if (y2 > this.height - 70) {
@@ -328,35 +323,13 @@ public class FishBotScreen extends Screen {
 			addPresetRow(x2, y2, name, active);
 			y2 += ROW_HEIGHT;
 		}
-
-		y2 += 6;
-		addRenderableWidget(new StringWidget(x2, y2, BUTTON_WIDTH, 10,
-				Component.translatable("fishbot.session.header"), this.font));
-		y2 += 12;
-
-		for (String name : bot.getConfigManager().listSessions()) {
-			if (y2 > this.height - 70) {
-				break;
-			}
-			addSessionRow(x2, y2, name, active);
-			y2 += ROW_HEIGHT;
-		}
-		// The preset/session lists self-limit to the visible area, so no scroll.
-		contentBottom = 44;
-	}
-
-	/** A built-in preset button that highlights when it is the active one. */
-	private void addBuiltInPreset(int x, int y, String key, FishBotConfig preset, String active) {
-		String displayName = Component.translatable(key).getString();
-		addRenderableWidget(Button.builder(presetLabel(displayName, active), btn -> applyNamedPreset(displayName, preset))
-				.bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT)
-				.tooltip(Tooltip.create(Component.translatable(key + ".tip"))).build());
+		contentBottom = Math.max(200, y2);
 	}
 
 	/** A custom preset row: apply button (with indicator) + delete button. */
 	private void addPresetRow(int x, int y, String name, String active) {
 		addRenderableWidget(Button.builder(presetLabel(name, active),
-				btn -> applyNamedPreset(name, bot.getConfigManager().loadCustomPreset(name)))
+				btn -> applyCustomPreset(name))
 				.bounds(x, y, BUTTON_WIDTH - 46, BUTTON_HEIGHT)
 				.tooltip(Tooltip.create(Component.translatable("fishbot.preset.apply.tip"))).build());
 		addRenderableWidget(Button.builder(Component.translatable("fishbot.preset.delete"), btn -> {
@@ -366,8 +339,126 @@ public class FishBotScreen extends Screen {
 				.tooltip(Tooltip.create(Component.translatable("fishbot.preset.delete.tip"))).build());
 	}
 
+	/** Save the current configuration under the typed custom name. */
+	private void savePreset() {
+		String name = newPresetName.trim();
+		if (name.isEmpty()) {
+			return;
+		}
+		bot.getConfigManager().saveCustomPreset(name, ConfigManager.copy(bot.getConfig()));
+		newPresetName = "";
+		rebuild();
+	}
+
+	/** Restore the built-in defaults. */
+	private void applyDefaults() {
+		FishBotConfig copy = ConfigManager.copy(Presets.defaults());
+		copy.activePreset = "defaults";
+		bot.getConfigManager().setConfig(copy);
+		rebuild();
+	}
+
+	/** Load a saved custom preset. */
+	private void applyCustomPreset(String name) {
+		FishBotConfig preset = bot.getConfigManager().loadCustomPreset(name);
+		if (preset == null) {
+			return;
+		}
+		FishBotConfig copy = ConfigManager.copy(preset);
+		copy.activePreset = name;
+		bot.getConfigManager().setConfig(copy);
+		rebuild();
+	}
+
+	// ------------------------------------------------------------------
+	// Sessions tab
+	// ------------------------------------------------------------------
+
+	private void buildSessionsTab() {
+		SessionStats stats = bot.getStats();
+		int x1 = leftCol();
+		int x2 = rightCol();
+		int y1 = top();
+		int y2 = top();
+
+		// Current session info panel.
+		addRenderableWidget(new StringWidget(x1, y1, BUTTON_WIDTH, 10,
+				Component.translatable("fishbot.session.current"), this.font));
+		y1 += 12;
+		y1 = addSessionInfoRow(x1, y1, "fishbot.session.info.time",
+				SessionStats.formatDuration(stats.sessionMillis()), "fishbot.session.tip.time");
+		y1 = addSessionInfoRow(x1, y1, "fishbot.session.info.fish",
+				Integer.toString(stats.getCatches()), "fishbot.session.tip.fish");
+		y1 = addSessionInfoRow(x1, y1, "fishbot.session.info.xp",
+				Integer.toString(stats.getXpGained()), "fishbot.session.tip.xp");
+		y1 = addSessionInfoRow(x1, y1, "fishbot.session.info.rare",
+				Integer.toString(stats.getRareCatches()), "fishbot.session.tip.rare");
+
+		// Session controls.
+		y1 += 6;
+		addRenderableWidget(Button.builder(Component.translatable("fishbot.session.new"), btn -> {
+			bot.getStats().reset();
+			rebuild();
+		}).bounds(x1, y1, BUTTON_WIDTH, BUTTON_HEIGHT)
+				.tooltip(Tooltip.create(Component.translatable("fishbot.session.new.tip"))).build());
+		y1 += ROW_HEIGHT;
+		addRenderableWidget(Button.builder(Component.translatable("fishbot.session.save"), btn -> saveCurrentSession())
+				.bounds(x1, y1, BUTTON_WIDTH, BUTTON_HEIGHT)
+				.tooltip(Tooltip.create(Component.translatable("fishbot.session.save.tip"))).build());
+
+		// Saved sessions list.
+		addRenderableWidget(new StringWidget(x2, y2, BUTTON_WIDTH, 10,
+				Component.translatable("fishbot.session.header"), this.font));
+		y2 += 12;
+		List<String> sessions = bot.getConfigManager().listSessions();
+		if (sessions.isEmpty()) {
+			addRenderableWidget(new StringWidget(x2, y2, BUTTON_WIDTH, 10,
+					Component.translatable("fishbot.session.none"), this.font));
+		} else {
+			for (String name : sessions) {
+				if (y2 > this.height - 70) {
+					break;
+				}
+				addSessionRow(x2, y2, name);
+				y2 += ROW_HEIGHT;
+			}
+		}
+		contentBottom = Math.max(200, Math.max(y1, y2));
+	}
+
+	private int addSessionInfoRow(int x, int y, String labelKey, String value, String tipKey) {
+		Button row = Button.builder(Component.translatable(labelKey).append(": ")
+						.append(Component.literal(value).withStyle(ChatFormatting.AQUA)),
+				btn -> {
+				})
+				.bounds(x, y, BUTTON_WIDTH, BUTTON_HEIGHT)
+				.tooltip(Tooltip.create(Component.translatable(tipKey))).build();
+		row.active = false;
+		addRenderableWidget(row);
+		return y + ROW_HEIGHT;
+	}
+
+	/** Save the current session's stats and settings to a file. */
+	private void saveCurrentSession() {
+		SessionStats stats = bot.getStats();
+		FishBotSession session = new FishBotSession();
+		session.name = "session_" + timestamp();
+		session.savedAt = System.currentTimeMillis();
+		session.sessionMillis = stats.sessionMillis();
+		session.catches = stats.getCatches();
+		session.xp = stats.getXpGained();
+		session.rareCatches = stats.getRareCatches();
+		session.config = ConfigManager.copy(bot.getConfig());
+		bot.getConfigManager().saveSession(session);
+		if (this.minecraft != null && this.minecraft.player != null) {
+			this.minecraft.player.sendSystemMessage(Component.translatable("fishbot.session.saved", session.name));
+		}
+		rebuild();
+	}
+
 	/** A saved session row: apply (with hover stats + indicator) + delete. */
-	private void addSessionRow(int x, int y, String name, String active) {
+	private void addSessionRow(int x, int y, String name) {
+		String active = bot.getConfig().activePreset;
 		Button.Builder applyBuilder = Button.builder(presetLabel(name, active), btn -> applySession(name))
 				.bounds(x, y, BUTTON_WIDTH - 46, BUTTON_HEIGHT);
 		FishBotSession session = bot.getConfigManager().loadSession(name);
@@ -377,27 +468,12 @@ public class FishBotScreen extends Screen {
 		addRenderableWidget(applyBuilder.build());
 		addRenderableWidget(Button.builder(Component.translatable("fishbot.preset.delete"), btn -> {
 			bot.getConfigManager().deleteSession(name);
+			if (this.minecraft != null && this.minecraft.player != null) {
+				this.minecraft.player.sendSystemMessage(Component.translatable("fishbot.session.deleted", name));
+			}
 			rebuild();
 		}).bounds(x + BUTTON_WIDTH - 46, y, 46, BUTTON_HEIGHT)
 				.tooltip(Tooltip.create(Component.translatable("fishbot.preset.delete.tip"))).build());
-	}
-
-	/** Label with a green check-mark indicator if this is the active preset. */
-	private Component presetLabel(String name, String active) {
-		if (name.equals(active)) {
-			return Component.literal(name).append(Component.literal("  ✓").withStyle(ChatFormatting.GREEN));
-		}
-		return Component.literal(name);
-	}
-
-	private void applyNamedPreset(String displayName, FishBotConfig preset) {
-		if (preset == null) {
-			return;
-		}
-		FishBotConfig copy = ConfigManager.copy(preset);
-		copy.activePreset = displayName;
-		bot.getConfigManager().setConfig(copy);
-		rebuild();
 	}
 
 	private void applySession(String name) {
@@ -413,30 +489,20 @@ public class FishBotScreen extends Screen {
 		rebuild();
 	}
 
-	private void createSession() {
-		SessionStats stats = bot.getStats();
-		FishBotSession session = new FishBotSession();
-		session.name = "session_" + timestamp();
-		session.savedAt = System.currentTimeMillis();
-		session.sessionMillis = stats.sessionMillis();
-		session.catches = stats.getCatches();
-		session.xp = stats.getXpGained();
-		session.rareCatches = stats.getRareCatches();
-		session.config = ConfigManager.copy(bot.getConfig());
-		bot.getConfigManager().saveSession(session);
-
-		FishBotConfig copy = ConfigManager.copy(bot.getConfig());
-		copy.activePreset = session.name;
-		bot.getConfigManager().setConfig(copy);
-		rebuild();
+	/** Label with a green check-mark indicator if this is the active preset. */
+	private Component presetLabel(String name, String active) {
+		if (name.equals(active)) {
+			return Component.literal(name).append(Component.literal("  ✓").withStyle(ChatFormatting.GREEN));
+		}
+		return Component.literal(name);
 	}
 
 	private Component sessionTooltip(FishBotSession session) {
-		String text = Component.translatable("fishbot.session.time",
+		String text = Component.translatable("fishbot.session.info.time",
 				SessionStats.formatDuration(session.sessionMillis)).getString() + "\n"
-				+ Component.translatable("fishbot.session.fish", session.catches).getString() + "\n"
-				+ Component.translatable("fishbot.session.xp", session.xp).getString() + "\n"
-				+ Component.translatable("fishbot.session.rare", session.rareCatches).getString();
+				+ Component.translatable("fishbot.session.info.fish", session.catches).getString() + "\n"
+				+ Component.translatable("fishbot.session.info.xp", session.xp).getString() + "\n"
+				+ Component.translatable("fishbot.session.info.rare", session.rareCatches).getString();
 		return Component.literal(text);
 	}
 

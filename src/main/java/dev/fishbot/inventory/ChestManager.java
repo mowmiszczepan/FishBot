@@ -60,6 +60,8 @@ public class ChestManager {
 	private int movedItems;
 	private boolean pendingManualRequest;
 	private int transferTick;
+	/** Positions already found to be completely full; skipped by the next search. */
+	private final java.util.Set<Long> filledChests = new java.util.HashSet<>();
 
 	public ChestManager(FishBotCore bot) {
 		this.bot = bot;
@@ -85,6 +87,7 @@ public class ChestManager {
 		target = null;
 		transferQueue.clear();
 		menuId = -1;
+		filledChests.clear();
 		cooldownUntil = Math.max(cooldownUntil, now() + 2000);
 	}
 
@@ -151,6 +154,10 @@ public class ChestManager {
 			for (int dy = -radius; dy <= radius; dy++) {
 				for (int dz = -radius; dz <= radius; dz++) {
 					BlockPos pos = origin.offset(dx, dy, dz);
+					// Skip containers already confirmed to be completely full.
+					if (filledChests.contains(pos.asLong())) {
+						continue;
+					}
 					Block block = mc.level.getBlockState(pos).getBlock();
 					if (!(block instanceof AbstractChestBlock || block instanceof BarrelBlock || block instanceof ShulkerBoxBlock)) {
 						continue;
@@ -199,6 +206,15 @@ public class ChestManager {
 			AbstractContainerMenu menu = containerScreen.getMenu();
 			menuId = menu.containerId;
 			buildTransferPlan(menu);
+			// If there is something to deposit but the container has no free slot,
+			// mark it as full, close it and let the next search pick another chest.
+			if (!transferQueue.isEmpty() && !hasChestSpace(menu)) {
+				if (target != null) {
+					filledChests.add(target.asLong());
+				}
+				closeAndContinue(mc, menuId);
+				return;
+			}
 			movedItems = 0;
 			transferTick = 0;
 			state = State.TRANSFER;
@@ -210,6 +226,31 @@ public class ChestManager {
 			cooldownUntil = now() + FAIL_COOLDOWN_MS;
 			target = null;
 		}
+	}
+
+	/** Close the current chest screen and immediately look for the next chest. */
+	private void closeAndContinue(Minecraft mc, int containerId) {
+		if (mc.player != null && mc.player.connection != null && containerId >= 0) {
+			mc.player.connection.send(new ServerboundContainerClosePacket(containerId));
+		}
+		mc.gui.setScreen(null);
+		target = null;
+		menuId = -1;
+		transferQueue.clear();
+		// Short pause so the server registers the close before we reopen another.
+		state = State.COOLDOWN;
+		cooldownUntil = now() + 600;
+	}
+
+	/** Whether the opened container has at least one empty chest-side slot. */
+	private static boolean hasChestSpace(AbstractContainerMenu menu) {
+		for (Slot slot : menu.slots) {
+			// Chest-side slots use their own container, not the player Inventory.
+			if (!(slot.container instanceof Inventory) && slot.getItem().isEmpty()) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private void buildTransferPlan(AbstractContainerMenu menu) {

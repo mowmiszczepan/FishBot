@@ -77,10 +77,11 @@ public class HudOverlay {
 				stats.getXpGained(), Math.round(stats.xpPerHour())).getString());
 		colors.add(GOOD_COLOR);
 
-		// Which preset / session is currently applied.
+		// Which preset / session is currently applied. Built-in keys (e.g.
+		// "defaults") are translated; anything else is a custom preset name.
 		String activePreset = config.activePreset;
 		if (activePreset != null && !activePreset.isEmpty()) {
-			lines.add(Component.translatable("fishbot.hud.preset", activePreset).getString());
+			lines.add(Component.translatable("fishbot.hud.preset", presetLabel(activePreset)).getString());
 			colors.add(TITLE_COLOR);
 		}
 
@@ -134,6 +135,16 @@ public class HudOverlay {
 			colors.add(percent > 40 ? GOOD_COLOR : (percent > 15 ? WARN_COLOR : BAD_COLOR));
 			shown++;
 		}
+	}
+
+	/** Translate a known built-in preset key, otherwise show the raw name. */
+	private static String presetLabel(String activePreset) {
+		String key = "fishbot.preset." + activePreset;
+		String translated = Component.translatable(key).getString();
+		if (!translated.equals(key)) {
+			return translated;
+		}
+		return activePreset;
 	}
 
 	private String statusText() {

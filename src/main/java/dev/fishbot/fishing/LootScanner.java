@@ -9,6 +9,7 @@ import dev.fishbot.inventory.ItemLists;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.phys.Vec3;
@@ -58,7 +59,7 @@ public class LootScanner {
 				continue;
 			}
 			ItemStack stack = itemEntity.getItem();
-			if (stack.isEmpty() || !isRareCatch(config, stack)) {
+			if (stack.isEmpty() || !isRareCatch(stack)) {
 				continue;
 			}
 			countedEntities.add(entity.getId());
@@ -69,15 +70,21 @@ public class LootScanner {
 		}
 	}
 
-	private boolean isRareCatch(FishBotConfig config, ItemStack stack) {
-		if (!ItemLists.matches(config.rareItems, stack)) {
+	/**
+	 * Fixed rare-drop rule: an enchanted book, an enchanted bow or an enchanted
+	 * fishing rod. This is intentionally independent of any user-editable list,
+	 * so it cannot be configured away or accidentally changed.
+	 */
+	private boolean isRareCatch(ItemStack stack) {
+		Item item = stack.getItem();
+		boolean isBook = item == Items.ENCHANTED_BOOK;
+		boolean isBow = item == Items.BOW;
+		boolean isRod = ItemLists.isRod(stack);
+		if (!isBook && !isBow && !isRod) {
 			return false;
 		}
-		// Only enchanted versions count as a "rare catch": an enchanted book is
-		// always enchanted, but bows and fishing rods only count once enchanted.
-		if (stack.is(Items.BOW) || ItemLists.isRod(stack)) {
-			return stack.isEnchanted();
-		}
-		return true;
+		// Enchanted books are always enchanted; bows and rods only count when
+		// actually enchanted (a plain/caught item is not a treasure drop).
+		return isBook || stack.isEnchanted();
 	}
 }

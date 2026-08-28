@@ -1,20 +1,25 @@
 package dev.fishbot.fishing;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 import net.minecraft.util.Util;
 
 /**
  * Tiny client-thread scheduler for delayed/repeating actions with
- * human-like timing. Only ever called from the client tick event.
+ * human-like timing.
+ *
+ * <p>The task queue is a {@link ConcurrentLinkedQueue} so that events arriving
+ * from a non-client thread (e.g. a network packet) may safely {@link #schedule}
+ * new tasks without racing the client-thread {@link #tick()} loop.
  */
 public class ActionScheduler {
 	public static final Random RANDOM = new Random();
 
-	private final List<Scheduled> queue = new ArrayList<>();
+	private final Queue<Scheduled> queue = new ConcurrentLinkedQueue<>();
 
 	private static final class Scheduled {
 		long runAt;
@@ -44,18 +49,24 @@ public class ActionScheduler {
 
 	public void tick() {
 		long now = Util.getMillis();
-		List<Runnable> toRun = new ArrayList<>();
-		Iterator<Scheduled> it = queue.iterator();
-		while (it.hasNext()) {
-			Scheduled s = it.next();
+		// Snapshot the tasks that are due, then remove-and-reinsert them so the
+		// iteration never mutates the collection while walking it.
+		List<Scheduled> due = new ArrayList<>();
+		for (Scheduled s : queue) {
 			if (now >= s.runAt) {
-				if (s.repeating) {
-					s.runAt = now + s.interval;
-				} else {
-					it.remove();
-				}
-				toRun.add(s.action);
+				due.add(s);
 			}
+		}
+		List<Runnable> toRun = new ArrayList<>();
+		for (Scheduled s : due) {
+			if (!queue.remove(s)) {
+				continue; // already cancelled/removed by another thread
+			}
+			if (s.repeating) {
+				s.runAt = now + s.interval;
+				queue.add(s);
+			}
+			toRun.add(s.action);
 		}
 		for (Runnable r : toRun) {
 			try {

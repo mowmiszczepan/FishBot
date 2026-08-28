@@ -33,6 +33,7 @@ public class FishingCore {
 	private boolean switchScheduled = false;
 	private boolean noRodsLeft = false;
 	private boolean haltedForPanic = false;
+	private boolean holdRecast = false;
 	private OpenWaterState lastOpenWaterState = OpenWaterState.UNKNOWN;
 	private boolean openWaterMessageShown = false;
 
@@ -100,7 +101,6 @@ public class FishingCore {
 		}
 
 		bot.getStats().onCatch();
-		detectOpenWater(mc);
 
 		// Watch the drops to spot treasure loot.
 		if (mc.player.fishing != null) {
@@ -131,7 +131,7 @@ public class FishingCore {
 
 	private void tryRecast() {
 		Minecraft mc = Minecraft.getInstance();
-		if (hookExists) {
+		if (hookExists || holdRecast) {
 			return;
 		}
 		if (mc.player == null || !isHoldingFishingRod(mc.player)) {
@@ -142,11 +142,12 @@ public class FishingCore {
 		}
 		useRod();
 		bot.getStats().onCast();
+		scheduleOpenWaterCheck();
 	}
 
 	/** Queue a plain recast (used by persistent mode and the clear-lag hook). */
 	public void queueRecast() {
-		if (recastQueued) {
+		if (recastQueued || holdRecast) {
 			return;
 		}
 		FishBotConfig config = bot.getConfig();
@@ -230,6 +231,7 @@ public class FishingCore {
 
 		useRod();
 		bot.getStats().onCast();
+		scheduleOpenWaterCheck();
 	}
 
 	private boolean isBobberInWater(Minecraft mc) {
@@ -265,6 +267,15 @@ public class FishingCore {
 		}
 	}
 
+	/**
+	 * Run the open-water validation shortly after the bobber has landed in the
+	 * water (rather than waiting until a bite), so the player sees the result
+	 * right after casting.
+	 */
+	private void scheduleOpenWaterCheck() {
+		bot.getScheduler().schedule(1200, () -> detectOpenWater(Minecraft.getInstance()));
+	}
+
 	/** Latest open-water result, for the HUD. */
 	public OpenWaterState getOpenWaterState() {
 		return hookExists ? lastOpenWaterState : OpenWaterState.UNKNOWN;
@@ -292,6 +303,36 @@ public class FishingCore {
 		if (result != null && result.consumesAction()) {
 			mc.gameRenderer.itemInHandRenderer.itemUsed(hand);
 		}
+	}
+
+	// ------------------------------------------------------------------
+	// Auto-eat coordination
+	// ------------------------------------------------------------------
+
+	/**
+	 * Reel in a cast bobber so the player can eat safely, and hold off any
+	 * automatic recast until {@link #castAfterEat} is called.
+	 */
+	public void reelInForEat() {
+		if (hookExists) {
+			useRod(); // reel in
+		}
+		recastQueued = false;
+		holdRecast = true;
+	}
+
+	/** Select the fishing rod and immediately recast once eating has finished. */
+	public void castAfterEat(Minecraft mc) {
+		holdRecast = false;
+		if (mc.player == null || mc.level == null || mc.gameMode == null) {
+			return;
+		}
+		if (!isHoldingFishingRod(mc.player)) {
+			return;
+		}
+		useRod();
+		bot.getStats().onCast();
+		scheduleOpenWaterCheck();
 	}
 
 	private InteractionHand getCorrectHand(LocalPlayer player) {
@@ -374,6 +415,7 @@ public class FishingCore {
 		switchScheduled = false;
 		noRodsLeft = false;
 		haltedForPanic = false;
+		holdRecast = false;
 		lastOpenWaterState = OpenWaterState.UNKNOWN;
 		openWaterMessageShown = false;
 		monitor.handleHookRemoved();
